@@ -12,7 +12,10 @@ sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1
 apt install git curl
 apt install jq curl -y
 
+# INSTAL PAKET SYSTEM YANG DU BUTUHKAN
+wget ${GITHUB}dependencies.sh && chmod +x dependencies.sh && ./dependencies.sh
 
+# SETUP DOMAIN
 echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo -e "        SETUP YOUR DOMAIN FOR THIS SCRIPT"
 echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
