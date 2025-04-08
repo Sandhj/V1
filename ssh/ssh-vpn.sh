@@ -1,5 +1,12 @@
 #!/bin/bash
 
+apt -y install jq
+apt -y install shc
+apt -y install wget curl
+apt-get install figlet -y
+apt-get install ruby -y
+gem install lolcat
+
 # AMBIL KEBUTUHAN SCRIPT 
 export DEBIAN_FRONTEND=noninteractive
 MYIP=$(wget -qO- ipinfo.io/ip);
@@ -7,9 +14,10 @@ MYIP2="s/xxxxxxxxx/$MYIP/g";
 NET=$(ip -o $ANU -4 route show to default | awk '{print $5}');
 source /etc/os-release
 ver=$VERSION_ID
+GITHUB="https://raw.githubusercontent.com/Paper890/sandi/main/"
 
 # SIMPLE PASSWORD 
-curl -sS https://raw.githubusercontent.com/Paper890/sandi/main/ssh/password | openssl aes-256-cbc -d -a -pass pass:scvps07gg -pbkdf2 > /etc/pam.d/common-password
+curl -sS ${GITHUB}ssh/password | openssl aes-256-cbc -d -a -pass pass:scvps07gg -pbkdf2 > /etc/pam.d/common-password
 chmod +x /etc/pam.d/common-password
 
 # SERVICE RC LOCAL
@@ -37,75 +45,20 @@ exit 0
 END
 
 chmod +x /etc/rc.local
-
 systemctl enable rc-local
 systemctl start rc-local.service
-
-
-#install jq
-apt -y install jq
-
-#install shc
-apt -y install shc
-
-# install wget and curl
-apt install python -y
-apt -y install wget curl
-
-#figlet
-apt-get install figlet -y
-apt-get install ruby -y
-gem install lolcat
-
-# set time GMT +7
-ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
 
 # set locale
 sed -i 's/AcceptEnv/#AcceptEnv/g' /etc/ssh/sshd_config
 
-
-install_ssl(){
-    if [ -f "/usr/bin/apt-get" ];then
-            isDebian=`cat /etc/issue|grep Debian`
-            if [ "$isDebian" != "" ];then
-                    apt-get install -y nginx certbot
-                    apt install -y nginx certbot
-                    sleep 3s
-            else
-                    apt-get install -y nginx certbot
-                    apt install -y nginx certbot
-                    sleep 3s
-            fi
-    else
-        yum install -y nginx certbot
-        sleep 3s
-    fi
-
-    systemctl stop nginx.service
-
-    if [ -f "/usr/bin/apt-get" ];then
-            isDebian=`cat /etc/issue|grep Debian`
-            if [ "$isDebian" != "" ];then
-                    echo "A" | certbot certonly --renew-by-default --register-unsafely-without-email --standalone -d $domain
-                    sleep 3s
-            else
-                    echo "A" | certbot certonly --renew-by-default --register-unsafely-without-email --standalone -d $domain
-                    sleep 3s
-            fi
-    else
-        echo "Y" | certbot certonly --renew-by-default --register-unsafely-without-email --standalone -d $domain
-        sleep 3s
-    fi
-}
-
-# install webserver
+# install webserver For Reverse Proxy
 apt -y install nginx
 cd
 rm /etc/nginx/sites-enabled/default
 rm /etc/nginx/sites-available/default
-wget -O /etc/nginx/nginx.conf "https://raw.githubusercontent.com/Paper890/sandi/main/ssh/nginx.conf"
+wget -O /etc/nginx/nginx.conf "${GITHUB}ssh/nginx.conf"
 rm /etc/nginx/conf.d/vps.conf
-wget -O /etc/nginx/conf.d/vps.conf "https://raw.githubusercontent.com/Paper890/sandi/main/ssh/vps.conf"
+wget -O /etc/nginx/conf.d/vps.conf "${GITHUB}ssh/vps.conf"
 /etc/init.d/nginx restart
 
 mkdir /etc/systemd/system/nginx.service.d
