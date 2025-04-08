@@ -1,166 +1,41 @@
 #!/bin/bash
 
-clear
-# Warna untuk output (sesuaikan dengan kebutuhan)
-NC='\e[0m'       # No Color (mengatur ulang warna teks ke default)
-RB='\e[31;1m'    # Red Bold
-GB='\e[32;1m'    # Green Bold
-YB='\e[33;1m'    # Yellow Bold
-BB='\e[34;1m'    # Blue Bold
-MB='\e[35;1m'    # Magenta Bold
-CB='\e[36;1m'    # Cyan Bold
-WB='\e[37;1m'    # White Bold
-
-HOSTING="https://raw.githubusercontent.com/Sandhj/ST/main"
-
-# Fungsi untuk mencetak pesan dengan warna
-print_msg() {
-    COLOR=$1
-    MSG=$2
-    echo -e "${COLOR}${MSG}${NC}"
-}
-
-# Fungsi untuk memeriksa keberhasilan perintah
-check_success() {
-    if [ $? -eq 0 ]; then
-        print_msg $GB "Berhasil"
-    else
-        print_msg $RB "Gagal: $1"
-        exit 1
-    fi
-}
-
-# Fungsi untuk menampilkan pesan kesalahan
-print_error() {
-    MSG=$1
-    print_msg $RB "Error: ${MSG}"
-}
-
-# Memastikan pengguna adalah root
-if [ "$EUID" -ne 0 ]; then
-  print_error "Harap jalankan skrip ini sebagai root."
-  exit 1
-fi
-
-clear
 # ============= BATAS AWAL SCRIPT UTAMA ============
-mkdir -p /usr/local/etc/xray/config >> /dev/null 2>&1
-mkdir -p /usr/local/etc/xray/dns >> /dev/null 2>&1
-touch /usr/local/etc/xray/dns/domain
-# Fungsi untuk memvalidasi domain
-validate_domain() {
-    local domain=$1
-    if [[ $domain =~ ^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-# Fungsi untuk meminta input domain
-input_domain() {
-    while true; do
-        read -rp $'\e[33;1mInput domain kamu: \e[0m' -e dns
-
-        if [ -z "$dns" ]; then
-            echo -e "${RB}Tidak ada input untuk domain!${NC}"
-        elif ! validate_domain "$dns"; then
-            echo -e "${RB}Format domain tidak valid! Silakan input domain yang valid.${NC}"
-        else
-            echo "$dns" > /usr/local/etc/xray/dns/domain
-            echo "DNS=$dns" > /var/lib/dnsvps.conf
-            break
-        fi
-    done
-}
-
-
+      mkdir -p /usr/local/etc/xray/config >> /dev/null 2>&1
+      mkdir -p /usr/local/etc/xray/dns >> /dev/null 2>&1
+      mkdir -p /user /tmp /usr/local/etc/xray /var/log/xray
+      touch /usr/local/etc/xray/dns/domain
 
 #Fungsi Input Domain
-echo -e "${BB}————————————————————————————————————————————————————————"
-echo -e "${YB}                      SETUP DOMAIN"
-echo -e "${BB}————————————————————————————————————————————————————————"
-
-input_domain
-
+      echo -e "————————————————————————————————————————————————————————"
+      echo -e "                      SETUP DOMAIN"
+      echo -e "————————————————————————————————————————————————————————"
+      read -r 'Input domain kamu:' dns
+      echo "$dns" > /usr/local/etc/xray/dns/domain
+      echo "DNS=$dns" > /var/lib/dnsvps.conf
+       
 
 # Update package list
-print_msg $YB "Setup Domain Done"
-print_msg $YB "Install Paket Yang Dibutuhkan"
-sleep 2
-apt update -y
-apt install socat netfilter-persistent bsdmainutils -y
-apt install vnstat lsof fail2ban -y
-apt install jq curl sudo cron -y
-apt install build-essential libpcre3 libpcre3-dev zlib1g zlib1g-dev openssl libssl-dev gcc clang llvm g++ valgrind make cmake debian-keyring debian-archive-keyring apt-transport-https systemd bind9-host gnupg2 ca-certificates lsb-release ubuntu-keyring debian-archive-keyring -y
-apt install unzip python-is-python3 python3-pip -y
-pip install psutil pandas tabulate rich py-cpuinfo distro requests pycountry geoip2 --break-system-packages
+      apt update -y
+      apt install socat netfilter-persistent bsdmainutils -y
+      apt install vnstat lsof fail2ban -y
+      apt install jq curl sudo cron -y
+      sudo apt update
+      sudo apt install -y curl unzip
+      apt install build-essential libpcre3 libpcre3-dev zlib1g zlib1g-dev openssl libssl-dev gcc clang llvm g++ valgrind make cmake debian-keyring debian-archive-keyring apt-transport-https systemd bind9-host gnupg2 ca-certificates lsb-release ubuntu-keyring debian-archive-keyring -y
+      apt install unzip python-is-python3 python3-pip -y
+      pip install psutil pandas tabulate rich py-cpuinfo distro requests pycountry geoip2 --break-system-packages
 
+# Istall Xray Core
+      LATEST_VERSION=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r '.tag_name')
+      DOWNLOAD_URL="https://github.com/XTLS/Xray-core/releases/download/$LATEST_VERSION/Xray-linux-64.zip"
 
-# Membuat direktori yang diperlukan
-print_msg $YB "Membuat direktori yang diperlukan..."
-sudo mkdir -p /user /tmp /usr/local/etc/xray /var/log/xray
-check_success "Gagal membuat direktori."
-
-# Menghapus file konfigurasi lama jika ada
-print_msg $YB "Menghapus file konfigurasi lama..."
-sudo rm -f /usr/local/etc/xray/city /usr/local/etc/xray/org /usr/local/etc/xray/timezone /usr/local/etc/xray/region
-check_success "Gagal menghapus file konfigurasi lama."
-
-# Fungsi untuk mendeteksi OS dan distribusi
-detect_os() {
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        OS=$NAME
-        VERSION=$VERSION_ID
-    else
-        print_msg $RB "Tidak dapat mendeteksi OS. Skrip ini hanya mendukung distribusi berbasis Debian dan Red Hat."
-        exit 1
-    fi
-}
-
-# Fungsi untuk memeriksa versi terbaru Xray-core
-get_latest_xray_version() {
-    LATEST_VERSION=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r '.tag_name')
-    if [ -z "$LATEST_VERSION" ]; then
-        print_msg $RB "Tidak dapat menemukan versi terbaru Xray-core."
-        exit 1
-    fi
-}
-
-# Fungsi untuk memasang Xray-core
-install_xray_core() {
-    ARCH=$(uname -m)
-    case $ARCH in
-        x86_64)
-            ARCH="64"
-            ;;
-        aarch64)
-            ARCH="arm64-v8a"
-            ;;
-        *)
-            print_msg $RB "Arsitektur $ARCH tidak didukung."
-            exit 1
-            ;;
-    esac
-
-    DOWNLOAD_URL="https://github.com/XTLS/Xray-core/releases/download/$LATEST_VERSION/Xray-linux-$ARCH.zip"
-
-    # Unduh dan ekstrak Xray-core
-    print_msg $YB "Mengunduh dan memasang Xray-core..."
-    curl -L -o xray.zip $DOWNLOAD_URL
-    check_success "Gagal mengunduh Xray-core."
-
-    sudo unzip -o xray.zip -d /usr/local/bin
-    check_success "Gagal mengekstrak Xray-core."
-    rm xray.zip
-
-    sudo chmod +x /usr/local/bin/xray
-    check_success "Gagal mengatur izin eksekusi untuk Xray-core."
-
-    # Membuat layanan systemd
-    print_msg $YB "Mengkonfigurasi layanan systemd untuk Xray-core..."
-    sudo bash -c 'cat <<EOF > /etc/systemd/system/xray.service
+      curl -L -o xray.zip $DOWNLOAD_URL
+      sudo unzip -o xray.zip -d /usr/local/bin
+      rm xray.zip
+      sudo chmod +x /usr/local/bin/xray    
+      
+cat <<EOF > /etc/systemd/system/xray.service
 [Unit]
 Description=Xray Service
 Documentation=https://github.com/xtls
@@ -183,73 +58,32 @@ OOMScoreAdjust=100
 
 [Install]
 WantedBy=multi-user.target
-EOF'
-    check_success "Gagal mengkonfigurasi layanan systemd untuk Xray-core."
+EOF
 
-    sudo systemctl daemon-reload
-    sudo systemctl enable xray
-    sudo systemctl start xray
-    check_success "Gagal memulai layanan Xray-core."
-}
-
-# Deteksi OS
-print_msg $YB "Mendeteksi sistem operasi..."
-detect_os
-
-# Cek apakah OS didukung
-if [[ "$OS" == "Ubuntu" || "$OS" == "Debian" || "$OS" == "Debian GNU/Linux" || "$OS" == "CentOS" || "$OS" == "Fedora" || "$OS" == "Red Hat Enterprise Linux" ]]; then
-    print_msg $GB "Mendeteksi OS: $OS $VERSION"
-else
-    print_msg $RB "Distribusi $OS tidak didukung oleh skrip ini. Proses instalasi dibatalkan."
-    exit 1
-fi
-
-# Memeriksa versi terbaru Xray-core
-print_msg $YB "Memeriksa versi terbaru Xray-core..."
-get_latest_xray_version
-print_msg $GB "Versi terbaru Xray-core: $LATEST_VERSION"
-
-# Memasang dependensi yang diperlukan
-print_msg $YB "Memasang dependensi yang diperlukan..."
-if [[ "$OS" == "Ubuntu" || "$OS" == "Debian" ]]; then
-    sudo apt update
-    sudo apt install -y curl unzip
-elif [[ "$OS" == "CentOS" || "$OS" == "Fedora" || "$OS" == "Red Hat Enterprise Linux" ]]; then
-    sudo yum install -y curl unzip
-fi
-check_success "Gagal memasang dependensi yang diperlukan."
-
-# Memasang Xray-core
-install_xray_core
-
-print_msg $GB "Pemasangan Xray-core versi $LATEST_VERSION selesai."
+sudo systemctl daemon-reload
+sudo systemctl enable xray
+sudo systemctl start xray
 
 # Mengumpulkan informasi dari ipinfo.io
-print_msg $YB "Mengumpulkan informasi lokasi dari ipinfo.io..."
-curl -s ipinfo.io/city?token=f209571547ff6b | sudo tee /usr/local/etc/xray/city
-curl -s ipinfo.io/org?token=f209571547ff6b | cut -d " " -f 2-10 | sudo tee /usr/local/etc/xray/org
-curl -s ipinfo.io/timezone?token=f209571547ff6b | sudo tee /usr/local/etc/xray/timezone
-curl -s ipinfo.io/region?token=f209571547ff6b | sudo tee /usr/local/etc/xray/region
-check_success "Gagal mengumpulkan informasi lokasi."
-
+      curl -s ipinfo.io/city?token=f209571547ff6b | sudo tee /usr/local/etc/xray/city
+      curl -s ipinfo.io/org?token=f209571547ff6b | cut -d " " -f 2-10 | sudo tee /usr/local/etc/xray/org
+      curl -s ipinfo.io/timezone?token=f209571547ff6b | sudo tee /usr/local/etc/xray/timezone
+      curl -s ipinfo.io/region?token=f209571547ff6b | sudo tee /usr/local/etc/xray/region
+      
 # Mengunduh dan menginstal Speedtest CLI
-print_msg $YB "Mengunduh dan menginstal Speedtest CLI..."
-curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash &>/dev/null
-sudo apt-get install -y speedtest &>/dev/null
-print_msg $YB "Speedtest CLI berhasil diinstal."
+      curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash &>/dev/null
+      sudo apt-get install -y speedtest &>/dev/null
 
 # Mengatur zona waktu ke Asia/Jakarta
-print_msg $YB "Mengatur zona waktu ke Asia/Jakarta..."
-sudo timedatectl set-timezone Asia/Jakarta &>/dev/null
-print_msg $YB "Zona waktu berhasil diatur."
+      sudo timedatectl set-timezone Asia/Jakarta &>/dev/null
 
-print_msg $YB "Instalasi WireProxy"
-rm -rf /usr/local/bin/wireproxy >> /dev/null 2>&1
-wget -O /usr/local/bin/wireproxy ${HOSTING}/wireproxy
-chmod +x /usr/local/bin/wireproxy
-check_success "Gagal instalasi WireProxy."
-print_msg $YB "Mengkonfigurasi WireProxy"
-cat > /etc/wireproxy.conf << END
+
+#Instalasi WireProxy
+      rm -rf /usr/local/bin/wireproxy >> /dev/null 2>&1
+      wget -O /usr/local/bin/wireproxy ${HOSTING}/wireproxy
+      chmod +x /usr/local/bin/wireproxy
+
+cat <<EOF > /etc/wireproxy.conf
 [Interface]
 PrivateKey = 4Osd07VYMrPGDtrJfRaRZ+ynuscBVi4PjzOZmLUJDlE=
 Address = 172.16.0.2/32, 2606:4700:110:8fdc:f256:b15d:9e5c:5d1/128
@@ -264,10 +98,8 @@ Endpoint = engage.cloudflareclient.com:2408
 
 [Socks5]
 BindAddress = 127.0.0.1:40000
-END
-check_success "Gagal mengkonfigurasi WireProxy."
+EOF
 
-print_msg $YB "Membuat service untuk WireProxy"
 cat > /etc/systemd/system/wireproxy.service << END
 [Unit]
 Description=WireProxy for WARP
